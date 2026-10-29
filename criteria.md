@@ -44,9 +44,9 @@ Two things worth knowing before you pick numbers:
 ---
 ## 1. False positives
 
-Of 10 human-written texts (at least 3 of them plain, simple writing), 0 get the high-confidence AI label.
+Out of 10 human-written texts 0 should get the high-confidence AI label.
 
-**Why this target:** Wrongly accusing a real writer costs them far more than missing some AI text. Plain writing is the case signal one is most likely to get wrong, so it has to be in the test set.
+**Why this target:** False positives are costly. Wrongly accusing a real writer costs far more than missing some AI text. Plain writing is the case signal one is most likely to get wrong, so it has to be in the test set.
 
 ---
 
