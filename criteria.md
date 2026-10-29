@@ -42,63 +42,43 @@ Two things worth knowing before you pick numbers:
   a **miss**.
 
 ---
-## 1.
+## 1. False positives
 
-<!-- Your criterion. It must name a number. -->
+Of 10 human-written texts (at least 3 of them plain, simple writing), 0 get the high-confidence AI label.
 
-
-
-**Why this target:**
-
-
+**Why this target:** Wrongly accusing a real writer costs them far more than missing some AI text. Plain writing is the case signal one is most likely to get wrong, so it has to be in the test set.
 
 ---
 
-## 2.
+## 2. Score spread
 
-<!-- Your criterion. -->
+The average combined score of 5 clearly-AI texts is at least 0.3 higher than the average for 5 clearly-human texts.
 
-
-
-**Why this target:**
-
-
+**Why this target:** If AI and human text score about the same, the signals aren't telling them apart. I'll revisit the 0.3 after I've seen real scores in Milestone 4.
 
 ---
 
-## 3.
+## 3. Label coverage
 
-<!-- Your criterion. -->
+Each of the three labels (high-confidence human, unsure, high-confidence AI) is produced by at least one real submission.
 
-
-
-**Why this target:**
-
-
+**Why this target:** A label that no score can reach means my ranges have a gap, and some writers would never see the right message.
 
 ---
 
-## 4.
+## 4. Unsure on disagreement
 
-<!-- Your criterion. -->
+Whenever the model score and the style score differ by more than 0.4, the label is "unsure", every time.
 
-
-
-**Why this target:**
-
-
+**Why this target:** When the two methods disagree, the system doesn't actually know. It should say so instead of picking AI or human.
 
 ---
 
-## 5.
+## 5. Appeals
 
-<!-- Your criterion. -->
+100% of appeals with a valid `content_id` set the status to `under_review` and appear in `GET /log`. An unknown `content_id` returns 404 and records nothing.
 
-
-
-**Why this target:**
-
-
+**Why this target:** The appeal is the only thing between a wrong accusation and nothing, so it can't fail, even once.
 
 ---
 
