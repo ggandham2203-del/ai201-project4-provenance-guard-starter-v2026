@@ -30,6 +30,7 @@ from flask import Flask, jsonify, request
 
 import audit
 import config
+import detector
 
 app = Flask(__name__)
 
@@ -150,6 +151,19 @@ def health():
 
 # ── YOU BUILD THIS ────────────────────────────────────────────────────────────
 
+MIN_WORDS = 10
+MAX_CHARS = 10_000
+
+
+def _reject(creator_id, status, error, message):
+    """Refuse a request, leave a trace in the log, and tell the caller why."""
+    audit.log_rejection(
+        creator_id=creator_id if isinstance(creator_id, str) else "unknown",
+        reason=error,
+    )
+    return jsonify({"error": error, "message": message}), status
+
+
 @app.post("/submit")
 # @limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute;{config.RATE_LIMIT_PER_DAY}/day")
 def submit():
@@ -199,17 +213,55 @@ def submit():
     what should this do when `text` is missing, empty, or enormous? A crash on
     a malformed input is one of the most common real failures there is.
     """
-    payload = request.get_json(silent=True) or {}
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    text = payload.get("text")
+    creator_id = payload.get("creator_id")
 
-    # TODO: delete this and build the route.
+    if not isinstance(creator_id, str) or not creator_id.strip():
+        return _reject(creator_id, 400, "missing_creator_id",
+                       "creator_id is required and must be a non-empty string.")
+    if not isinstance(text, str) or not text.strip():
+        return _reject(creator_id, 400, "missing_text",
+                       "text is required and must be a non-empty string.")
+    if len(text) > MAX_CHARS:
+        return _reject(creator_id, 413, "text_too_long",
+                       f"text must be at most {MAX_CHARS} characters.")
+    if len(text.split()) < MIN_WORDS:
+        return _reject(creator_id, 400, "text_too_short",
+                       f"text must be at least {MIN_WORDS} words.")
+
+    content_id = str(uuid.uuid4())
+
+    try:
+        model_score = detector.model_signal(text)
+    except detector.DetectorUnavailable as exc:
+        return _reject(creator_id, 503, "detector_unavailable", str(exc))
+    except ValueError as exc:
+        return _reject(creator_id, 400, "text_too_short", str(exc))
+
+    guess = "unsure"  # placeholder until Milestone 4
+
+    audit.log_decision(
+        content_id=content_id,
+        creator_id=creator_id,
+        guess=guess,
+        model_score=model_score,
+        style_score=None,
+        combined_score=None,
+        label=None,
+        status="decided",
+    )
+
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /submit isn't built yet — see the TODO in app.py.",
-        "you_sent": {
-            "text_length": len(payload.get("text", "")),
-            "creator_id": payload.get("creator_id"),
-        },
-    }), 501
+        "content_id": content_id,
+        "guess": guess,
+        "confidence": 0.5,
+        "label": "PLACEHOLDER",
+        "model_score": model_score,
+        "style_score": None,
+    }), 200
 
 
 @app.post("/appeal")
