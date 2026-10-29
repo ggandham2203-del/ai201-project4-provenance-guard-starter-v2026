@@ -52,11 +52,19 @@ def combine_signals(model_score: float, style_score: float) -> float:
     The weights in config.py are placeholders. Change them, or ignore them and
     write a different rule.
     """
-    # TODO: replace this
-    return (
+    # My rule (numbers live in config.py):
+    #   1. If the signals disagree by more than DISAGREEMENT_GAP, return 0.5.
+    #      Two methods disagreeing IS uncertainty, and 0.5 sits in the unsure band.
+    #   2. Otherwise a weighted average, with the style signal weighted more
+    #      (0.6) than the model signal (0.4), because the model signal is the one
+    #      that accused plain human writing in my tests.
+    if abs(model_score - style_score) > config.DISAGREEMENT_GAP:
+        return 0.5
+    combined = (
         config.WEIGHT_MODEL_SIGNAL * model_score
         + config.WEIGHT_STYLE_SIGNAL * style_score
     )
+    return round(min(max(combined, 0.0), 1.0), 4)
 
 
 def score_to_label(score: float) -> tuple[str, str]:

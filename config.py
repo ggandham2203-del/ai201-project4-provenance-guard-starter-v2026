@@ -54,8 +54,12 @@ DETECTOR_MAX_TOKENS = 400
 # down BEFORE you code it, and to put the numbers in your README. Whatever you
 # decide, it goes here.
 
-WEIGHT_MODEL_SIGNAL = 0.5
-WEIGHT_STYLE_SIGNAL = 0.5
+WEIGHT_MODEL_SIGNAL = 0.4   # signal one accused plain human writing in my tests
+WEIGHT_STYLE_SIGNAL = 0.6
+
+# If the two signals differ by more than this, the system doesn't know: the
+# combined score is forced to 0.5 (unsure). Criterion 4 in criteria.md.
+DISAGREEMENT_GAP = 0.4
 
 
 # ─── Thresholds (Milestone 5) ────────────────────────────────────────────────

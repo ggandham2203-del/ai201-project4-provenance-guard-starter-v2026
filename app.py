@@ -31,6 +31,8 @@ from flask import Flask, jsonify, request
 import audit
 import config
 import detector
+import scoring
+import stylometry
 
 app = Flask(__name__)
 
@@ -241,15 +243,18 @@ def submit():
     except ValueError as exc:
         return _reject(creator_id, 400, "text_too_short", str(exc))
 
-    guess = "unsure"  # placeholder until Milestone 4
+    style_score = stylometry.style_signal(text)
+    combined = scoring.combine_signals(model_score, style_score)
+
+    guess = "unsure"  # placeholder until Milestone 5
 
     audit.log_decision(
         content_id=content_id,
         creator_id=creator_id,
         guess=guess,
         model_score=model_score,
-        style_score=None,
-        combined_score=None,
+        style_score=style_score,
+        combined_score=combined,
         label=None,
         status="decided",
     )
@@ -257,10 +262,10 @@ def submit():
     return jsonify({
         "content_id": content_id,
         "guess": guess,
-        "confidence": 0.5,
+        "confidence": combined,
         "label": "PLACEHOLDER",
         "model_score": model_score,
-        "style_score": None,
+        "style_score": style_score,
     }), 200
 
 
