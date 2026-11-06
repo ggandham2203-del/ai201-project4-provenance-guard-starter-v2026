@@ -165,6 +165,12 @@ An appeal with an id that doesn't exist returns a 404 and writes nothing to the 
 - *What came back:* the "unsure" label's reassurance ("this isn't a finding that anything is wrong") could backfire and make a writer wonder what is wrong. The "unsure" and "AI" labels both hedge, so a reader may not feel much difference between them. And both tell the writer to act ("send us a note", "tell us") without saying how.
 - *What I changed:* nothing yet, but I noted that the site needs a visible way to appeal.
 
+**Moment 3: choosing the one improvement (unit 8)**
+
+- *What I asked for:* to make my one improvement a reweight toward signal one, which my diagnosis seemed to point at.
+- *What came back:* before changing anything, Claude recomputed every saved score under different weights. It showed the reweight would barely help (criterion 2 only reached 0.3 at a 0.9 / 0.1 split, where two of my own texts were labeled AI), would leave evasion at 0 of 10 at every weight, would start labeling real writers as AI from 0.6 / 0.4, and would make the human label unreachable from 0.5 / 0.5. Claude also corrected something it had told me earlier: it had said my disagreement rule threw away good signals, but recomputing without the rule showed the rule was not responsible for any miss.
+- *What I changed:* I dropped the reweight and chose to lower the minimum word count from 10 to 5 instead, which fixed my worst outcome. Claude drafted the diagnoses and the README sections from my run data, and I approved each one before it went in.
+
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
 ---
@@ -534,17 +540,19 @@ It also had a cost. MF04 (punctuation only) and the first five flood requests (F
 
 ## What's Still Broken
 
-<!-- For each attack still getting through and each criterion still missed:
-     what you'd do, and why you stopped. -->
-
-
+| Still broken | What I'd do | Why I stopped |
+|---|---|---|
+| All 10 evasion attacks (EV01 to EV10), plus PI01 and PI02 labeled human | Replace or rebuild signal two, which is a weak signal carrying 60% of the combined score, and make signal one robust to typos and short text | The unit allows one change. Reweighting was tested and does not fix it (evasion stays at 0 of 10 labeled AI at every weight), and a new signal is much more than one change |
+| Criterion 2 missed (gap +0.236 against a target of 0.3) | Same root cause, so I would re-test it after signal two is fixed | Same as above. Raising the model weight to 0.9 reached the target only by labeling two of my own texts as AI, which breaks criterion 1 |
+| None of the 56 attacks was ever labeled AI | The AI label only fires on unedited, very predictable AI text. It needs a better signal, not a threshold move | Lowering the AI threshold would put real writers on the wrong side of it: FP02 and FP05 already score 0.588 and 0.593 |
+| FP02 and FP05 sit close to the accusation line | Widen the unsure band slightly, or improve signal one on formal and technical writing | Moving the threshold trades directly against criterion 2, and I had one change |
+| RQ10 and RQ11 untested (rate limited before reaching the route) | Re-run them from a fresh minute so they reach the route | I ran out of time in this unit |
+| Short texts score unreliably, and junk like MF04 and the flood rows now reach the model | Collect real short samples and measure, and consider a smarter minimum than a word count | One correct result on FP08 is not evidence, and the side effects only showed up in the after run |
+| A refused submission still has no `content_id`, so a writer whose request is refused has nothing to appeal with | Return an id for refusals so they can still be appealed | It was outside the one change I made |
 
 **The trade I'd make if this ran for real:**
 
-<!-- Two sentences. Fewer wrong accusations means more AI text getting through.
-     Say which way you'd go and WHO PAYS FOR IT. -->
-
-
+I would keep the wide unsure band and the high AI threshold and accept that more AI text gets through, because a wrong accusation lands on one real writer who may have the least room to argue back, such as a second-language or younger writer, while a missed detection only costs the site a little. The people who pay for that choice are the site and its readers, who see more unflagged AI text, and the honest writers whose work sits next to it; I would take that over accusing someone who wrote every word themselves.
 
 <!-- ═════════════════════════════════════════════════════════════════════
 
