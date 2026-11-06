@@ -292,40 +292,156 @@ My service answered with a 400 (`text_too_short`) and no result. That is eight w
 
 ## Run Log and Verdicts
 
-<!-- Your five criteria across three trials. `run_eval.py --label before`. -->
+Five criteria, three trials each, nothing changed in between (`python run_eval.py --label before`, full output in `results/run_2026-11-06_1239_before.md`; the appeal test in `results/appeal_check_before.txt`). The scenarios are in `scenarios.py`. Every text scored identically on all three trials, so the repeats show a stable result rather than a lucky one.
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |
+| 1. My own writing labeled AI | 0 of 10 | 0/10 | 0/10 | 0/10 | MET |
+| 2. AI average above human average | at least 0.3 | +0.236 | +0.236 | +0.236 | **MISSED** |
+| 3. All three labels reachable | 3 of 3 | 3/3 | 3/3 | 3/3 | MET |
+| 4. Gap over 0.4 means unsure | no exceptions | 0 exceptions | 0 exceptions | 0 exceptions | MET |
+| 5. Appeals always work | 100% | 5/5 | 5/5 | 5/5 | MET |
 
-**Real output from one trial**, pasted as text, naming the file and function
-that produced it:
+**How I decided each verdict**
+
+1. None of my ten texts was labeled AI on any trial. But only three got the human label and seven got "unsure", so the unsure band is absorbing my writing rather than the system recognizing it. Five of the ten (dejected, too many things, K-Pop, project report, formal report) were also the texts I tuned the weights on in unit 7, so only the other five are fresh.
+2. The AI paragraphs averaged 0.622 and the human paragraphs 0.386, a gap of 0.236 against a target of 0.3. A miss on every trial. I did not change the target.
+3. The three texts produced `ai` (0.691), `unsure` (0.5) and `human` (0.338) on every trial.
+4. 21 of the 81 results had a model/style gap over 0.4 and all 21 were labeled unsure. This is close to guaranteed by construction: `scoring.py::combine_signals` returns exactly 0.5 whenever the gap exceeds 0.4, and 0.5 always falls in the unsure band. It is an easy target, and I say so here instead of crediting the system with more than it did.
+5. All 15 appeals (5 on each of 3 trials) returned `under_review` and all 15 appear in `GET /log`. An appeal with an unknown `content_id` returned a 404 and the log held 197 entries both before and after. I tested this one by hand with curl because `scenarios.py` can only send text; it cannot submit and then appeal.
+
+**Real output from trial 1**, from `run_eval.py::main` calling `app.py::submit`, with the combined score from `scoring.py::combine_signals` and the label from `scoring.py::score_to_label`.
+
+Criterion 1, my own writing (two of the ten):
 
 ```json
+[
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.5836,
+    "model_score": 0.706,
+    "style_score": 0.502,
+    "sent": "I feel very dejected and confused and I dont really like how my life i"
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.3379,
+    "model_score": 0.5231,
+    "style_score": 0.2145,
+    "sent": "The aim is to build a novel data science system to evaluate applicants"
+  }
+]
+```
 
+Criterion 2, a clearly-AI text and a clearly-human text:
+
+```json
+[
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 0.691,
+    "model_score": 0.8855,
+    "style_score": 0.5613,
+    "sent": "The Big Bang Theory is the scientific explanation for how the universe"
+  }
+]
+[
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.5029,
+    "model_score": 0.5445,
+    "style_score": 0.4752,
+    "sent": "We are plannign a trip to texas to attend our friend's wedding. It is "
+  }
+]
+```
+
+Criterion 3, label coverage (all three):
+
+```json
+[
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 0.691,
+    "model_score": 0.8855,
+    "style_score": 0.5613,
+    "label": "This may have been written with an AI tool. We can get this wrong, especially with plain or simple writing. If you wrote it yourself, tell us and a person will review it.",
+    "sent": "The Big Bang Theory is the scientific explanation for how the universe"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.5,
+    "model_score": 0.5364,
+    "style_score": 0.0747,
+    "label": "We can't tell for sure whether this was written by a person or with an AI tool. This isn't a finding that anything is wrong. If you'd like someone to take a look, you can send us a note.",
+    "sent": "Honestly, I didn't expect remote work to change my routine this much. "
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.3379,
+    "model_score": 0.5231,
+    "style_score": 0.2145,
+    "label": "This looks like it was written by a person.",
+    "sent": "The aim is to build a novel data science system to evaluate applicants"
+  }
+]
+```
+
+Criterion 4, two texts from the gap rule scenario (the first has a gap of 0.53, the second 0.32):
+
+```json
+[
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.5,
+    "model_score": 0.7063,
+    "style_score": 0.1809,
+    "sent": "For any data science system, the crucial component is data. We need to"
+  },
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 0.691,
+    "model_score": 0.8855,
+    "style_score": 0.5613,
+    "sent": "The Big Bang Theory is the scientific explanation for how the universe"
+  }
+]
+```
+
+Criterion 5, the first three of the fifteen appeals from `results/appeal_check_before.txt` (produced by `app.py::appeal`), then the checks:
+
+```
+trial 1 appeal 1: { "content_id": "20de4cbb-ad58-4fac-be1c-df7efb2b1e40", "message": "Thanks. Your appeal has been recorded and a person will review it.", "status": "under_review"}
+trial 1 appeal 2: { "content_id": "3fba42d4-f548-4eff-9b60-3bc37a50915f", "message": "Thanks. Your appeal has been recorded and a person will review it.", "status": "under_review"}
+trial 1 appeal 3: { "content_id": "954a42a1-9fa8-4fb0-9743-39cf056a5f4c", "message": "Thanks. Your appeal has been recorded and a person will review it.", "status": "under_review"}
+appeals found in GET /log for appeal_eval_* creators: 15
+unknown content_id -> HTTP 404; log entries before: 197, after: 197
 ```
 
 **Diagnoses**
 
-<!-- For each miss AND each broken attack: the stage and the mechanism.
+1. **Criterion 2 missed. Stage: the combining rule, over signal two.** On these ten paragraphs, signal one alone separated AI from human by 0.409 (0.813 against 0.404) and signal two alone by only 0.136 (0.510 against 0.374). My rule weights signal two at 0.6, a choice I made in unit 7 from ten short texts, so the weaker signal dominated and cut the gap to 0.236. A secondary cause is signal one on the weather paragraph: its numbers and symbols (79°F, (26°C)) raise perplexity, so the model scored it only 0.424.
 
-     Your service has five stages: the route, signal one, signal two, the
-     combining rule, and the label mapping.
+2. **All ten evasion attacks got through. Stages: signal two, mostly, and signal one.** Signal two scored 6 of the 10 below 0.35. The attacks (broken-up sentences, a pasted quotation, a human paragraph bolted on, one very long and one very short sentence, repeated stanzas) change sentence lengths, and sentence spread carries 70% of the style score, so the signal reads the change as human. Signal one fails differently: typos (EV01) and very short text (EV08) pulled its score down to 0.16 and 0.25.
 
-     Not a diagnosis:  "The evasion attacks got through."
-     A diagnosis:      "Four evasion inputs got through. All four had typos
-                        added to AI-generated text. My second signal measures
-                        word variety, and typos raise word variety — so it read
-                        them as more human. My combining rule weights that
-                        signal at 0.6, so it dragged the whole score down."
+3. **None of the 56 attacks was labeled AI. Stage: signal two, plus its 0.6 weight.** Signal two reads almost everything as human. Its average was 0.27 on the evasion inputs, 0.31 on the false-positive inputs and 0.12 on the injection inputs, against 0.51 on the unedited AI paragraphs. With 60% of the weight on a signal that low, the AI label only fires when an unmodified AI paragraph is both very predictable and shaped like AI. I also checked whether my disagreement rule was to blame, since it forced EV02, EV03, EV09 and EV10 to 0.5. It was not: without the rule they would have scored 0.32, 0.33, 0.34 and 0.58, none of them above the 0.65 AI line, and three would have been labeled human instead of unsure.
 
-     Look for a pattern. Five failures on one signal is one problem, not five. -->
+4. **FP08, my worst outcome. Stage: the route.** `MIN_WORDS = 10` in `app.py` refused an eight-word genuine submission with a 400. No decision means no `content_id`, so the writer had nothing to appeal.
 
+5. **PI01 and PI02, labeled human. Stages: signal one and signal two, the same mechanism as the evasion attacks.** Nothing in my pipeline reads instructions, so no instruction was obeyed. The injected prefixes changed the text's statistics: the model score on the same underlying paragraph ranged from 0.20 (the "SYSTEM:" prefix) to 0.64 depending on the prefix, and signal two scored below 0.2 on all six injection inputs.
 
+6. **RQ10 and RQ11: untested.** Both were rate limited as my own address before reaching the route, so I do not know what the route does with them.
+
+**The pattern.** Diagnoses 1, 2, 3 and 5 are one problem: signal two is a weak signal carrying 60% of the combined score. FP08 is a separate one, in the route.
 
 ---
 
