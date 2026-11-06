@@ -447,22 +447,88 @@ unknown content_id -> HTTP 404; log entries before: 197, after: 197
 
 ## The Improvement
 
-**What I changed:**
+**What I changed:** one line in `app.py`: `MIN_WORDS = 10` became `MIN_WORDS = 5`. Nothing else moved: not the weights, thresholds, labels, signals or the limiter.
 
-**Which diagnosis pointed at it:**
+**Which diagnosis pointed at it:** diagnosis 4. My worst outcome, FP08 (*"Went for a run. Legs hurt. Worth it."*, eight words), was refused with a 400, so the writer got no decision, no `content_id` and no way to appeal. I chose this over reweighting toward signal one (the change diagnosis 1 suggests) after recomputing the saved scores under different weights. Reweighting barely helped: criterion 2 only reached its 0.3 target at a 0.9 / 0.1 split, where two of my own texts were labeled AI, evasion stayed at 0 of 10 labeled AI at every weight, real writers started being labeled AI from 0.6 / 0.4 on, and the human label became unreachable from 0.5 / 0.5 on. So I did not make that change.
 
 ### Attack Run — After
 
-<!-- Same format. `run_attacks.py --label after` -->
+`python run_attacks.py --set attack_set --label after`, full output in `results/attack_run_2026-11-06_1257_after.md`. Same 56 attacks, same marking rules as the before run. Seven rows changed, all from a 400 to a 200.
 
+**Totals: before 41 HELD, 13 BROKE, 2 UNTESTED. After 42 HELD, 12 BROKE, 2 UNTESTED.** Still none of the 56 labeled AI.
 
+| Family | Attacks | HELD before / after | BROKE before / after | UNTESTED |
+|---|---|---|---|---|
+| evasion | 10 | 0 / 0 | 10 / 10 | 0 |
+| false_positive | 8 | 7 / 8 | 1 / 0 | 0 |
+| prompt_injection | 6 | 4 / 4 | 2 / 2 | 0 |
+| malformed | 20 | 18 / 18 | 0 / 0 | 2 |
+| flood_same_creator | 12 | 12 / 12 | 0 / 0 | 0 |
 
-**Did it help, and how do I know:**
+| ID | Family | Before | After | Mark (after) |
+|---|---|---|---|---|
+| EV01 | evasion | unsure 0.385 | unsure 0.385 | BROKE |
+| EV02 | evasion | unsure 0.500 | unsure 0.500 | BROKE |
+| EV03 | evasion | unsure 0.500 | unsure 0.500 | BROKE |
+| EV04 | evasion | unsure 0.543 | unsure 0.543 | BROKE |
+| EV05 | evasion | human 0.197 | human 0.197 | BROKE |
+| EV06 | evasion | human 0.333 | human 0.333 | BROKE |
+| EV07 | evasion | unsure 0.473 | unsure 0.473 | BROKE |
+| EV08 | evasion | human 0.311 | human 0.311 | BROKE |
+| EV09 | evasion | unsure 0.500 | unsure 0.500 | BROKE |
+| EV10 | evasion | unsure 0.500 | unsure 0.500 | BROKE |
+| FP01 | false_positive | unsure 0.500 | unsure 0.500 | HELD |
+| FP02 | false_positive | unsure 0.588 | unsure 0.588 | HELD |
+| FP03 | false_positive | unsure 0.500 | unsure 0.500 | HELD |
+| FP04 | false_positive | unsure 0.500 | unsure 0.500 | HELD |
+| FP05 | false_positive | unsure 0.593 | unsure 0.593 | HELD |
+| FP06 | false_positive | unsure 0.500 | unsure 0.500 | HELD |
+| FP07 | false_positive | unsure 0.500 | unsure 0.500 | HELD |
+| FP08 | false_positive | refused (400) | human 0.219 | HELD |
+| PI01 | prompt_injection | human 0.275 | human 0.275 | BROKE |
+| PI02 | prompt_injection | human 0.145 | human 0.145 | BROKE |
+| PI03 | prompt_injection | unsure 0.355 | unsure 0.355 | HELD |
+| PI04 | prompt_injection | unsure 0.500 | unsure 0.500 | HELD |
+| PI05 | prompt_injection | unsure 0.500 | unsure 0.500 | HELD |
+| PI06 | prompt_injection | human 0.341 | human 0.341 | HELD |
+| MF01 | malformed | refused (400) | refused (400) | HELD |
+| MF02 | malformed | refused (400) | refused (400) | HELD |
+| MF03 | malformed | refused (400) | refused (400) | HELD |
+| MF04 | malformed | refused (400) | unsure 0.500 | HELD |
+| MF05 | malformed | refused (400) | refused (400) | HELD |
+| MF06 | malformed | refused (400) | refused (400) | HELD |
+| MF07 | malformed | unsure 0.500 | unsure 0.500 | HELD |
+| MF08 | malformed | refused (413) | refused (413) | HELD |
+| RQ01 | malformed | refused (400) | refused (400) | HELD |
+| RQ02 | malformed | refused (400) | refused (400) | HELD |
+| RQ03 | malformed | refused (400) | refused (400) | HELD |
+| RQ04 | malformed | refused (400) | refused (400) | HELD |
+| RQ05 | malformed | refused (400) | refused (400) | HELD |
+| RQ06 | malformed | refused (400) | refused (400) | HELD |
+| RQ07 | malformed | refused (400) | refused (400) | HELD |
+| RQ08 | malformed | refused (400) | refused (400) | HELD |
+| RQ09 | malformed | refused (400) | refused (400) | HELD |
+| RQ10 | malformed | rate limited | rate limited | UNTESTED (429, never reached the route) |
+| RQ11 | malformed | rate limited | rate limited | UNTESTED (429, never reached the route) |
+| RQ12 | malformed | refused (400) | refused (400) | HELD |
+| FL01_01 | flood_same_creator | refused (400) | unsure 0.500 | HELD |
+| FL01_02 | flood_same_creator | refused (400) | unsure 0.500 | HELD |
+| FL01_03 | flood_same_creator | refused (400) | unsure 0.500 | HELD |
+| FL01_04 | flood_same_creator | refused (400) | unsure 0.500 | HELD |
+| FL01_05 | flood_same_creator | refused (400) | unsure 0.500 | HELD |
+| FL01_06 | flood_same_creator | rate limited | rate limited | HELD |
+| FL01_07 | flood_same_creator | rate limited | rate limited | HELD |
+| FL01_08 | flood_same_creator | rate limited | rate limited | HELD |
+| FL01_09 | flood_same_creator | rate limited | rate limited | HELD |
+| FL01_10 | flood_same_creator | rate limited | rate limited | HELD |
+| FL01_11 | flood_same_creator | rate limited | rate limited | HELD |
+| FL01_12 | flood_same_creator | rate limited | rate limited | HELD |
 
-<!-- Widening the unsure band usually fixes one problem and creates another.
-     Reporting that trade honestly is worth full credit. -->
+The five criteria, run again with `python run_eval.py --label after` (`results/run_2026-11-06_1257_after.md`): every result is identical to the before run, on all three trials. Own writing labeled AI 0 of 10, criterion 2 gap +0.236 (still MISSED), all three labels reachable, no gap-rule exceptions. The appeal check (`results/appeal_check_after.txt`) again returned `under_review` for all 15 appeals, and an unknown id returned a 404.
 
+**Did it help, and how do I know:** it fixed what it was aimed at, and nothing else. FP08 went from a 400 refusal to a decision (human, 0.219), so that writer now has a `content_id` and can appeal; that is one row out of 56, and the only BROKE mark that moved. My criteria did not change at all, because every text in them is longer than five words.
 
+It also had a cost. MF04 (punctuation only) and the first five flood requests (FL01_01 to FL01_05) were refused with a 400 before and are now scored by the model (unsure, 0.5). Junk now gets a decision and a log entry, and flood requests now do real work before the limiter stops the sixth. The limiter still holds: seven 429s, unchanged. Short texts also score unreliably, and one correct result on FP08 does not show otherwise. So the change trades a refusal for a possibly unreliable score, and it leaves the actual cause of the signal failures (signal two) untouched.
 
 ---
 

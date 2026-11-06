@@ -153,7 +153,7 @@ def health():
 
 # ── YOU BUILD THIS ────────────────────────────────────────────────────────────
 
-MIN_WORDS = 10
+MIN_WORDS = 5
 MAX_CHARS = 10_000
 
 
