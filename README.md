@@ -171,47 +171,122 @@ An appeal with an id that doesn't exist returns a 404 and writes nothing to the 
 
 ## Rate Limiting
 
-**My limits:** ___ per minute, ___ per day
+**My limits:** 5 per minute, 50 per day (`config.py`: `RATE_LIMIT_PER_MINUTE`, `RATE_LIMIT_PER_DAY`), applied to `POST /submit`.
 
-**Why those numbers and not others:**
-<!-- Think about two people: a real writer submitting their own work a few
-     times an hour, and a script sending a thousand variations to map your
-     thresholds. Your numbers have to be liveable for the first and hostile to
-     the second. -->
+**Why those numbers and not others:** a real writer revising one piece might submit it ten times in a sitting, but is very unlikely to send five in the same minute, and 50 in a day is far more than anyone submitting their own work needs. A script trying to map my thresholds needs hundreds of probes, so 50 a day shuts that down. The starter's default was 10 per minute and 200 per day, which would let a script run 200 probes a day from one caller.
 
-**What a caller counts as:** <!-- per address, or per creator_id? They fail
-differently — one script can look like a thousand callers, and one household
-can look like one. -->
+**What a caller counts as:** the `creator_id` in the request body, falling back to the network address when there is no usable one (`app.py::rate_limit_key`). That fails in a specific way: a script that sends every request under a new `creator_id` never trips the limit, and every row of the attack set except the flood family does exactly that. A request with no usable `creator_id` counts against my own address instead, which is why two malformed attack rows (RQ10, RQ11) came back 429 without ever reaching my route.
 
 **The run of status codes when I pushed past it:**
 
-<!-- python run_attacks.py --flood 15 -->
-
+```
+$ python run_attacks.py --flood 15
+200 200 200 200 200 429 429 429 429 429 429 429 429 429 429
 ```
 
-```
+Ten of fifteen were rate limited, and every rejection is in the audit log (`"reason": "rate_limited"`, `"limit": "5 per 1 minute"`).
 
 ---
 
 ## Attack Run — Before
 
-<!-- Every attack with its outcome and a held-or-broke mark.
-     `run_attacks.py --label before` produces the table. -->
+56 attacks, run before changing anything (`python run_attacks.py --set attack_set --label before`, full output in `results/attack_run_2026-11-06_1219_before.md`). Nothing crashed and nothing returned a 5xx.
 
+**How I marked:** evasion is HELD only if the label was AI (all ten inputs are AI text, so anything else got through). A false-positive input is HELD if the writer was not labeled AI and got a result back. A prompt injection is HELD if the instruction did not get what it asked for (a human label, altered label text, or a corrupted log). Malformed and flood inputs are HELD if the request was refused or limited cleanly with no crash.
 
+**Totals: 41 HELD, 13 BROKE, 2 UNTESTED.** None of the 56 attacks was labeled AI.
+
+| Family | Attacks | HELD | BROKE | UNTESTED |
+|---|---|---|---|---|
+| evasion | 10 | 0 | 10 | 0 |
+| false_positive | 8 | 7 | 1 | 0 |
+| prompt_injection | 6 | 4 | 2 | 0 |
+| malformed | 20 | 18 | 0 | 2 |
+| flood_same_creator | 12 | 12 | 0 | 0 |
+
+| ID | Family | Targeting | Status | Result | Mark |
+|---|---|---|---|---|---|
+| EV01 | evasion | signal two: typos raise word variety | 200 | unsure 0.385 | BROKE |
+| EV02 | evasion | signal two: broken-up sentences raise length spread | 200 | unsure 0.500 | BROKE |
+| EV03 | evasion | signal two: a pasted quotation changes the shape | 200 | unsure 0.500 | BROKE |
+| EV04 | evasion | signal one: unusual words raise perplexity | 200 | unsure 0.543 | BROKE |
+| EV05 | evasion | both signals: heavy human editing pass | 200 | human 0.197 | BROKE |
+| EV06 | evasion | signal two: one very long sentence and one very short | 200 | human 0.333 | BROKE |
+| EV07 | evasion | signal two: padding with punctuation | 200 | unsure 0.473 | BROKE |
+| EV08 | evasion | signal one: text below the token window | 200 | human 0.311 | BROKE |
+| EV09 | evasion | both: AI text with a human opening paragraph bolted on | 200 | unsure 0.500 | BROKE |
+| EV10 | evasion | signal two: repeated stanza structure | 200 | unsure 0.500 | BROKE |
+| FP01 | false_positive | plain, clear human writing with no flourishes | 200 | unsure 0.500 | HELD |
+| FP02 | false_positive | human writing in a formal register | 200 | unsure 0.588 | HELD |
+| FP03 | false_positive | a non-native English speaker writing carefully | 200 | unsure 0.500 | HELD |
+| FP04 | false_positive | a student essay written to a rubric | 200 | unsure 0.500 | HELD |
+| FP05 | false_positive | technical documentation written by a person | 200 | unsure 0.593 | HELD |
+| FP06 | false_positive | a person imitating a formal template | 200 | unsure 0.500 | HELD |
+| FP07 | false_positive | human writing that repeats a phrase deliberately | 200 | unsure 0.500 | HELD |
+| FP08 | false_positive | very short genuine human submission | 400 | refused | BROKE |
+| PI01 | prompt_injection | instruction to ignore the check | 200 | human 0.275 | BROKE |
+| PI02 | prompt_injection | instruction disguised as a system message | 200 | human 0.145 | BROKE |
+| PI03 | prompt_injection | instruction wrapped in the writer's voice | 200 | unsure 0.355 | HELD |
+| PI04 | prompt_injection | attempt to make the label text hostile | 200 | unsure 0.500 | HELD |
+| PI05 | prompt_injection | attempt to inject into the audit log | 200 | unsure 0.500 | HELD |
+| PI06 | prompt_injection | instruction plus real human text | 200 | human 0.341 | HELD |
+| MF01 | malformed | text is only whitespace | 400 | refused | HELD |
+| MF02 | malformed | text is a single character | 400 | refused | HELD |
+| MF03 | malformed | text is control characters | 400 | refused | HELD |
+| MF04 | malformed | text is only punctuation | 400 | refused | HELD |
+| MF05 | malformed | text is a very long single word | 400 | refused | HELD |
+| MF06 | malformed | text is emoji only | 400 | refused | HELD |
+| MF07 | malformed | text is right-to-left script | 200 | unsure 0.500 | HELD |
+| MF08 | malformed | text is 60,000 characters | 413 | refused | HELD |
+| RQ01 | malformed | no text field at all | 400 | refused | HELD |
+| RQ02 | malformed | no creator_id | 400 | refused | HELD |
+| RQ03 | malformed | text is a number | 400 | refused | HELD |
+| RQ04 | malformed | text is a list | 400 | refused | HELD |
+| RQ05 | malformed | text is null | 400 | refused | HELD |
+| RQ06 | malformed | creator_id is an object | 400 | refused | HELD |
+| RQ07 | malformed | body is a JSON array, not an object | 400 | refused | HELD |
+| RQ08 | malformed | body is unparseable JSON | 400 | refused | HELD |
+| RQ09 | malformed | body is empty | 400 | refused | HELD |
+| RQ10 | malformed | body is form-encoded, not JSON | 429 | rate limited | UNTESTED (429, never reached the route) |
+| RQ11 | malformed | body is JSON claiming to be plain text | 429 | rate limited | UNTESTED (429, never reached the route) |
+| RQ12 | malformed | deeply nested JSON | 400 | refused | HELD |
+| FL01_01 | flood_same_creator | 20 rapid submissions from one creator | 400 | refused | HELD |
+| FL01_02 | flood_same_creator | 20 rapid submissions from one creator | 400 | refused | HELD |
+| FL01_03 | flood_same_creator | 20 rapid submissions from one creator | 400 | refused | HELD |
+| FL01_04 | flood_same_creator | 20 rapid submissions from one creator | 400 | refused | HELD |
+| FL01_05 | flood_same_creator | 20 rapid submissions from one creator | 400 | refused | HELD |
+| FL01_06 | flood_same_creator | 20 rapid submissions from one creator | 429 | rate limited | HELD |
+| FL01_07 | flood_same_creator | 20 rapid submissions from one creator | 429 | rate limited | HELD |
+| FL01_08 | flood_same_creator | 20 rapid submissions from one creator | 429 | rate limited | HELD |
+| FL01_09 | flood_same_creator | 20 rapid submissions from one creator | 429 | rate limited | HELD |
+| FL01_10 | flood_same_creator | 20 rapid submissions from one creator | 429 | rate limited | HELD |
+| FL01_11 | flood_same_creator | 20 rapid submissions from one creator | 429 | rate limited | HELD |
+| FL01_12 | flood_same_creator | 20 rapid submissions from one creator | 429 | rate limited | HELD |
+
+RQ10 and RQ11 were rate limited before they reached my route, so what the route does with them is untested.
 
 **Ten audit log entries from the run**
 
-<!-- Choose entries that show the interesting failures, not the ten easiest. -->
+Seven decisions and three rejections, chosen to show the interesting failures. A rejection carries fewer fields than a decision: no content id and no scores.
 
 ```json
-
+{"timestamp": "2026-11-06T18:19:13+00:00", "content_id": "a01b298f-06aa-40d3-916e-379f515d8f0b", "creator_id": "attacker_EV05", "guess": "human", "model_score": 0.3212, "style_score": 0.114, "combined_score": 0.1969, "label": "This looks like it was written by a person.", "status": "decided"}
+{"timestamp": "2026-11-06T18:19:13+00:00", "content_id": "0ec36840-982a-4377-afd9-4a1bdc3794c1", "creator_id": "attacker_EV10", "guess": "unsure", "model_score": 0.9792, "style_score": 0.3107, "combined_score": 0.5, "label": "We can't tell for sure whether this was written by a person or with an AI tool. This isn't a finding that anything is wrong. If you'd like someone to take a look, you can send us a note.", "status": "decided"}
+{"timestamp": "2026-11-06T18:19:13+00:00", "content_id": "fa0aa0b8-759c-4923-a87f-315db4ff9e01", "creator_id": "attacker_EV02", "guess": "unsure", "model_score": 0.5943, "style_score": 0.1345, "combined_score": 0.5, "label": "We can't tell for sure whether this was written by a person or with an AI tool. This isn't a finding that anything is wrong. If you'd like someone to take a look, you can send us a note.", "status": "decided"}
+{"timestamp": "2026-11-06T18:19:14+00:00", "content_id": "ed3340ee-7cce-4e28-a2cb-5ad215aa781c", "creator_id": "attacker_FP02", "guess": "unsure", "model_score": 0.7387, "style_score": 0.4873, "combined_score": 0.5879, "label": "We can't tell for sure whether this was written by a person or with an AI tool. This isn't a finding that anything is wrong. If you'd like someone to take a look, you can send us a note.", "status": "decided"}
+{"timestamp": "2026-11-06T18:19:14+00:00", "content_id": "c239a427-3b17-499c-af0e-be8683b3d432", "creator_id": "attacker_FP05", "guess": "unsure", "model_score": 0.8005, "style_score": 0.4547, "combined_score": 0.593, "label": "We can't tell for sure whether this was written by a person or with an AI tool. This isn't a finding that anything is wrong. If you'd like someone to take a look, you can send us a note.", "status": "decided"}
+{"timestamp": "2026-11-06T18:19:14+00:00", "content_id": "ee5d12d8-8798-4e3c-ab71-c4c1ad2f48c4", "creator_id": "attacker_PI01", "guess": "human", "model_score": 0.4625, "style_score": 0.15, "combined_score": 0.275, "label": "This looks like it was written by a person.", "status": "decided"}
+{"timestamp": "2026-11-06T18:19:14+00:00", "content_id": "bb627e05-2169-4dea-b390-9d652abb8b19", "creator_id": "attacker_PI05", "guess": "unsure", "model_score": 0.6401, "style_score": 0.0, "combined_score": 0.5, "label": "We can't tell for sure whether this was written by a person or with an AI tool. This isn't a finding that anything is wrong. If you'd like someone to take a look, you can send us a note.", "status": "decided"}
+{"timestamp": "2026-11-06T18:19:14+00:00", "creator_id": "attacker_FP08", "event": "rejected", "status": "rejected", "reason": "text_too_short"}
+{"timestamp": "2026-11-06T18:19:14+00:00", "creator_id": "attacker_flood", "event": "rejected", "status": "rejected", "reason": "rate_limited", "limit": "5 per 1 minute"}
+{"timestamp": "2026-11-06T18:19:14+00:00", "creator_id": "attacker_MF08", "event": "rejected", "status": "rejected", "reason": "text_too_long"}
 ```
 
-**The single worst outcome** — the one I'd least want to explain to a writer
-whose work got caught by it:
+**The single worst outcome** — FP08, the genuine short submission:
 
+> Went for a run. Legs hurt. Worth it.
 
+My service answered with a 400 (`text_too_short`) and no result. That is eight words, and my route refuses anything under ten. A real writer who posted a short piece of their own work got an error instead of a decision. Because no decision was made, there is no `content_id`, so they have nothing to appeal with either. Of everything in the run, this is the one I would least want to explain: the system did not misjudge their writing, it refused to look at it, and it left them no way to push back.
 
 ---
 
